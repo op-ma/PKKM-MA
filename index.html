@@ -13,14 +13,15 @@ const STRUKTUR=[{"k":"A","t":"USAHA PENGEMBANGAN MADRASAH","s":[{"k":"A1","t":"M
 const $=i=>document.getElementById(i);
 const E=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const SG=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},SS=(k,v)=>{try{v?sessionStorage.setItem(k,v):sessionStorage.removeItem(k)}catch(e){}};
-let S={nm:localStorage.getItem('pk_nm')||'',pw:SG('pk_pw')||'',d:{bukti:[],komentar:[],nilai:[]},p:{},pg:'home',it:null,cb:null,nav:innerWidth>=1024};
+let S={nm:localStorage.getItem('pk_nm')||'',pw:SG('pk_pw')||'',d:{bukti:[],komentar:[],nilai:[]},p:{},bn:{},pg:'home',q:'',it:null,cb:null,nav:innerWidth>=1024};
 async function api(b){
   const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({pwd:S.pw,...b})});
   const j=await r.json();
   if(!j.ok)throw new Error(j.msg);return j;
 }
 async function run(fn){try{await fn();}catch(e){alert(e.message);}}
-async function muat(){S.d=await api({action:'load'});render();if(S.it)bukaItem(S.it);}
+function pakaiButir(){STRUKTUR.forEach(b=>b.s.forEach(s=>s.i.forEach(i=>{if(i[2]===undefined)i[2]=i[1];i[1]=S.bn[i[0]]||i[2];})));}
+async function muat(){S.d=await api({action:'load'});S.bn={};(S.d.butir||[]).forEach(r=>S.bn[r.itemId]=r.nama);pakaiButir();render();if(S.it)bukaItem(S.it);}
 async function muatProfil(){S.p=(await api({action:'profil'})).profil;render();}
 const by=(a,id)=>a.filter(x=>x.itemId===id);
 const box=(h,w='max-w-2xl')=>`<div class="fixed inset-0 bg-black/50 flex items-center justify-center p-3 z-50" onclick="if(event.target===this)tutup()"><div class="bg-white rounded-2xl w-full ${w} max-h-[90vh] overflow-y-auto p-5 border-t-4 border-amber-500">${h}</div></div>`;
@@ -30,35 +31,152 @@ const b64=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.re
 function adminForm(){$('modal').innerHTML=box(`<h3 class="font-bold text-emerald-800 text-center">🔑 Masuk Admin</h3><p class="text-xs text-center text-slate-500 mb-4">Khusus admin sekolah untuk mengunggah dan mengelola berkas</p>
  <input id="pp" type="password" placeholder="Password admin" class="w-full border rounded-lg p-2 mb-4" onkeydown="if(event.key==='Enter')masukAdmin()"><button onclick="masukAdmin()" class="w-full bg-emerald-700 text-white rounded-lg py-2 font-semibold">Masuk</button>`,'max-w-sm');}
 function masukAdmin(){run(async()=>{const pwd=$('pp').value;await api({action:'cekPwd',pwd});S.pw=pwd;SS('pk_pw',pwd);tutup();await muat();});}
-function keluarAdmin(){S.pw='';SS('pk_pw','');tutup();render();}
+function keluarAdmin(){if(S.pg==='analisis')S.pg='home';S.pw='';SS('pk_pw','');tutup();render();}
 // ---- layout
 function menu(){
   const m=(k,l)=>`<button onclick="goto('${k}')" class="w-full text-left px-4 py-2 text-sm rounded-lg mb-1 ${S.pg===k?'bg-amber-500 text-emerald-950 font-semibold':'hover:bg-emerald-800'}">${l}</button>`;
   return `<aside class="fixed inset-y-0 left-0 w-64 bg-emerald-900 text-white overflow-y-auto z-40 transition-transform ${S.nav?'':'-translate-x-full'}">
   <div class="p-5 text-center border-b border-emerald-700"><div class="w-16 h-16 mx-auto rounded-full bg-amber-400 flex items-center justify-center text-3xl mb-2 overflow-hidden">${S.p&&S.p.logoId?`<img src="https://drive.google.com/thumbnail?id=${E(S.p.logoId)}&sz=w200" class="w-full h-full object-contain bg-white">`:'🕌'}</div><div class="fh text-lg font-bold">PORTAL PKKM</div><div class="fh text-amber-300 text-sm font-semibold">MA AL MA'TUQ</div>
   <div class="text-[10px] text-emerald-200 mt-2 leading-tight">PENILAIAN KINERJA<br>KEPALA MADRASAH<br>TAHUN PENILAIAN 2026</div></div>
-  <div class="p-3"><div class="text-[11px] tracking-widest text-amber-300 px-2 mb-2">NAVIGASI UTAMA</div>${m('home','🏠 Halaman Muka')}
+  <div class="p-3"><div class="text-[11px] tracking-widest text-amber-300 px-2 mb-2">NAVIGASI UTAMA</div>${m('home','🏠 Halaman Muka')}${m('profil','🏫 Profil Madrasah')}${S.pw?m('analisis','📊 Analisis Kelengkapan'):''}
   <div class="text-[11px] tracking-widest text-amber-300 px-2 mt-3 mb-2">BERKAS PKKM</div>${STRUKTUR.map(b=>m(b.k,b.k+'. '+E(b.t))).join('')}
   <div class="border-t border-emerald-700 mt-3 pt-3">${S.pw?`<div class="text-xs text-emerald-200 px-2 mb-2">Mode Admin aktif</div><button onclick="keluarAdmin()" class="w-full bg-red-500 rounded-lg py-1.5 text-sm">Keluar Admin</button>`:`<button onclick="adminForm()" class="w-full bg-amber-400 text-emerald-950 rounded-lg py-1.5 text-sm font-semibold">🔑 Masuk Admin</button>`}</div></div></aside>`;
 }
-function goto(k){S.pg=k;if(innerWidth<1024)S.nav=false;render();scrollTo(0,0);}
+function analisis(){
+  const st=it=>({a:it.filter(i=>by(S.d.bukti,i[0]).length),b:it.filter(i=>!by(S.d.bukti,i[0]).length)}),pc=(n,t)=>t?Math.round(n/t*100):0,
+    all=STRUKTUR.flatMap(b=>b.s.flatMap(s=>s.i)),T=st(all),pT=pc(T.a.length,all.length),
+    bar=p=>`<div class="h-2 bg-amber-100 rounded"><div class="h-2 rounded ${p>=75?'bg-emerald-600':p>=50?'bg-amber-500':'bg-red-500'}" style="width:${p}%"></div></div>`,
+    lb=p=>p>=100?'Lengkap':p>=75?'Hampir lengkap':p>=50?'Sedang berjalan':'Perlu perhatian',
+    row=i=>`<div onclick="bukaItem('${i[0]}')" class="flex gap-2 text-sm py-1 border-t cursor-pointer hover:bg-emerald-50"><span class="text-xs text-slate-400 w-12 shrink-0">${i[0]}</span><span class="flex-1">${E(i[1])}</span></div>`;
+  return `<main class="w-full p-4 lg:p-6"><h2 class="font-bold text-emerald-800 text-lg">Analisis Kelengkapan Berkas</h2>
+  <div class="bg-white rounded-xl shadow p-4 mt-3"><div class="flex justify-between text-sm mb-1"><b>Keseluruhan · ${lb(pT)}</b><span>${T.a.length} ada · ${T.b.length} belum · ${pT}%</span></div>${bar(pT)}</div>
+  ${STRUKTUR.map(b=>{const it=b.s.flatMap(s=>s.i),r=st(it),p=pc(r.a.length,it.length);
+  return `<section class="bg-white rounded-xl shadow mt-4 p-4"><div class="flex justify-between items-start gap-2"><h3 class="font-bold text-emerald-800">${b.k}. ${E(b.t)}</h3><span class="text-sm shrink-0 font-semibold">${p}% · ${lb(p)}</span></div>${bar(p)}
+  <p class="text-xs text-slate-500 mt-1 mb-3">${r.a.length} butir sudah ada · ${r.b.length} butir belum ada dari ${it.length} butir</p>
+  ${b.s.map(s=>{const q=st(s.i),pp=pc(q.a.length,s.i.length);return`<div class="mb-2"><div class="flex justify-between text-xs"><span>${s.k}. ${E(s.t)}</span><span>${q.a.length}/${s.i.length}</span></div>${bar(pp)}</div>`}).join('')}
+  <details class="mt-3"><summary class="cursor-pointer text-sm font-semibold text-red-700">❌ Belum ada (${r.b.length})</summary>${r.b.map(row).join('')||'<p class="text-sm text-slate-400">Semua butir sudah memiliki bukti.</p>'}</details>
+  <details class="mt-1"><summary class="cursor-pointer text-sm font-semibold text-emerald-700">✅ Sudah ada (${r.a.length})</summary>${r.a.map(row).join('')||'<p class="text-sm text-slate-400">Belum ada bukti.</p>'}</details>
+  <button onclick="goto('${b.k}')" class="mt-3 text-xs underline text-emerald-700">Buka halaman ${b.k} →</button></section>`}).join('')}</main>`;
+}
+const PMD={
+ tagline:`يحبّنا ونحبّه\nLove Us & We Love It.`,
+ identitas:`Nama Madrasah: MAS AL-MA’TUQ\nNSM: 131232020076\nNPSN: 20280423\nSK. Pendirian: Kw. 10.4/4/PP.00.6/5158/2010\nTahun Pendirian: 2010\nTahun Beroperasi: 2010\nAkreditasi: A\nAlamat: Kp. Cikaroya Rt. 16/03 Desa Gunungjaya, Kec. Cisaat, Kab. Sukabumi 43152`,
+ kepala:`Nama: Irwansyah Ramdani, S.S., M.Pd.\nTempat, Tanggal Lahir: Sukabumi, 25 Agustus 1977\nTempat Tugas: Pesantren Al-Ma’tuq\nTMT: 01 Agustus 2004\nS1: UIN Syarif Hidayatullah - Jakarta\nS2: UIKA - Bogor\nAlamat: Komplek Pesantren Al-Ma’tuq, Kp. Cikaroya Ds. Gunungjaya, Kec. Cisaat Kab. Sukabumi`,
+ visi:`Madrasah yang menyelenggarakan pendidikan Islam secara optimal, untuk melahirkan generasi yang unggul dalam aqidah, ibadah, dan akhlak secara integral, memiliki wawasan internasional, dan mampu menghadapi tantangan global.`,
+ misi:`Menyelenggarakan Pendidikan tingkat menengah yang berkualitas dengan metode dan sarana yang selalu mengikuti perkembangan zaman;\nMenanamkan akidah ahlu sunah dengan pemahaman salafusshalih pada anak sesuai masa perkembangan intelektualitasnya;\nMembina ibadah yang benar dan akhlak yang mulia;\nMenanamkan cinta kepada Al-Quran, Sunnah, Bahasa Arab dan Ilmu Syar’i\nMenanamkan Kecintaan terhadap NKRI\nMembangkitkan semangat dakwah untuk memperbaiki kondisi umat islam\nMengajarkan ilmu-ilmu umum dan Bahasa inggris sebagai wasilah dakwah\nMembekali peserta didik dengan keterampilan hidup agar mampu mandiri dan siap menghadapi tantangan zaman`,
+ struktur:`Kepala Madrasah: Irwansyah Ramdani, S.S., M.Pd.\n---\nBendahara: Harpin Firmansyah, A.Md.\nKepala Tata Usaha: Zamzam Jamhur Munavar, BA.\n---\nWaka Humas / Waka Sarpras: Mumuh Mukhtaruddin, BA.; Lugina Hendarsah, S.Pd.\nWaka Kurikulum / Waka Kesiswaan: Saepuloh, S.Sos.; Ari Ramdani, BA.\nBimbingan dan Konseling: Sutrisna Armin N, S.Psi.\n---\nWali Kelas\nGuru Mata Pelajaran\n---\nPeserta Didik`,
+ ptk:`Pendidik: 55\nTenaga Kependidikan: 19`,
+ siswa:`2021-2022;8;120;64;9;125;66;7;91;70\n2022-2023;7;117;59;8;113;57;7;102;68\n2023-2024;8;141;92;8;107;60;8;106;55`,
+ unggulan:`Tahfidz Al-Qur’an\nDarul Hadist\nProgram Bahasa\nKSB (Kelompok Santri Berbakat)`,
+ tahfidz:`Kelas X: Juz 26 - 01\nKelas XI: Juz 02 - 03\nKelas XII: Juz 04 & 05\nCatatan: Total 10 Juz diakumulasi dari jenjang tsanawiyah`,
+ ekskul:`Ilmiah: Tahsin, B. Arab, B. Inggris, MIPA, Robotic\nSeni: Kaligrafi, Melukis, Handicraft, MC, Tata boga\nOlahraga: Pramuka, Panahan, Taekwondo, Futsal, Basket, Tarung Derajat, Tenis Meja`,
+ ksb:`Kaligrafi\nPidato 3 Bahasa\nPanahan\nRobotic\nTim KSM\nMC`,
+ kenaikan:`Menyelesaikan Program Pendidikan 2 Semester\nSikap (Rapot Akhlak) = Baik\nNilai Ekskul Wajib = Baik\nMapel Dibawah KKM Tidak Boleh Lebih Dari 2 Mapel\nKetidak Hadiran Tanpa Keterangan < 10%`,
+ kelulusan:`Menyelesaikan Program Pendidikan\nKognitif, Afektif & Motorik = Baik\nLulus Asesmen Madrasah\nLulus Ujian Pesantren\nLulus Hafalan Al-Quran 10 Juz\nLulus Praktik Mengajar\nLulus Praktik Khutbah Jum’at dan Imamah`};
+const SEC=[['tagline','Motto (Arab & Inggris)','Satu baris per bahasa'],['identitas','Identitas Madrasah','Satu baris: Label: Nilai'],['kepala','Profil Kepala Madrasah','Satu baris: Label: Nilai'],['visi','Visi','Teks bebas'],['misi','Misi','Satu poin per baris'],
+ ['struktur','Struktur Organisasi','Jabatan: Nama (beberapa nama dipisah titik koma). Baris --- memisahkan tingkat'],['ptk','Pendidik & Tenaga Kependidikan','Label: Jumlah'],['siswa','Data Peserta Didik','Tahun;X rombel;X L;X P;XI rombel;XI L;XI P;XII rombel;XII L;XII P (jumlah & total dihitung otomatis)'],
+ ['unggulan','Program Unggulan','Satu per baris'],['tahfidz','Target Tahfidz Al-Qur’an','Kelas: Juz ... ; baris "Catatan: ..." untuk catatan'],['ekskul','Kegiatan Ekstrakurikuler','Kategori: item, item, item'],['ksb','KSB (Kelompok Santri Berbakat)','Satu per baris'],
+ ['kenaikan','Kriteria Kenaikan Kelas','Satu per baris'],['kelulusan','Kriteria Kelulusan','Satu per baris']];
+const pmd=()=>{let o={};try{o=JSON.parse((S.p&&S.p.pm)||'{}')}catch(e){}return{...PMD,...o};};
+const ln=t=>String(t||'').split('\n').map(x=>x.trim()).filter(Boolean);
+const kv=t=>ln(t).map(l=>{const i=l.indexOf(':');return i<0?[l,'']:[l.slice(0,i).trim(),l.slice(i+1).trim()];});
+const TY=[['list','Daftar bernomor'],['text','Paragraf'],['kv','Tabel Label: Nilai']];
+const xb=(k,i)=>S.pw?`<button onclick="hapusBaris('${k}',${i})" class="text-red-500 text-xs ml-1 shrink-0" title="Hapus baris">✕</button>`:'';
+const tb=k=>S.pw?`<span class="text-xs space-x-1 shrink-0"><button onclick="tambahBaris('${k}')" class="bg-emerald-100 text-emerald-800 rounded px-2 py-0.5">➕ Tambah</button><button onclick="editBagian('${k}')" class="bg-amber-100 text-amber-800 rounded px-2 py-0.5">✏️ Edit</button><button onclick="hapusBagian('${k}')" class="bg-red-100 text-red-700 rounded px-2 py-0.5">🗑️ Hapus</button></span>`:'';
+const pcard=(k,t,b,c='')=>`<section id="pm_${k}" class="scroll-mt-20 bg-white rounded-2xl shadow p-5 ${c}"><div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h3 class="font-bold text-emerald-800 text-lg border-b-2 border-amber-400 pb-0.5">${t}</h3>${tb(k)}</div><div>${b||'<p class="text-sm text-slate-400">(kosong)</p>'}</div></section>`;
+const nlist=(a,k)=>a.length?`<ol class="space-y-1.5">${a.map((x,i)=>`<li class="flex gap-3 text-sm items-start"><span class="w-6 h-6 shrink-0 rounded-full bg-emerald-700 text-white text-xs flex items-center justify-center font-bold">${i+1}</span><span class="flex-1">${E(x)}</span>${xb(k,i)}</li>`).join('')}</ol>`:'';
+const kvt=(k,r)=>r.length?`<table class="w-full text-sm">${r.map((x,i)=>`<tr class="border-t align-top"><td class="py-1.5 pr-3 font-semibold w-44">${E(x[0])}</td><td class="py-1.5 pr-1">:</td><td class="py-1.5">${E(x[1])}</td><td class="w-6">${xb(k,i)}</td></tr>`).join('')}</table>`:'';
+const chips=(k,a,c)=>a.length?`<div class="flex flex-wrap gap-2">${a.map((x,i)=>`<span class="${c} rounded-xl px-4 py-2 text-sm font-semibold">${E(x)}${xb(k,i)}</span>`).join('')}</div>`:'';
+const BODY={
+ identitas:d=>kvt('identitas',kv(d.identitas)),
+ kepala:d=>{const f=S.p&&S.p.fotoId?`https://drive.google.com/thumbnail?id=${E(S.p.fotoId)}&sz=w600`:'';return ln(d.kepala).length?`<div class="flex flex-col sm:flex-row gap-4"><div class="w-36 h-48 shrink-0 mx-auto sm:mx-0 rounded-xl overflow-hidden border-4 border-amber-400 bg-amber-100 flex items-center justify-center">${f?`<img src="${f}" class="w-full h-full object-cover object-top">`:'<span class="text-5xl">👤</span>'}</div><div class="flex-1 self-start">${kvt('kepala',kv(d.kepala))}</div></div>`:'';},
+ visi:d=>ln(d.visi).length?`<p class="text-sm leading-relaxed whitespace-pre-line">${E(d.visi)}</p>`:'',
+ misi:d=>nlist(ln(d.misi),'misi'),
+ struktur:d=>{const lv=String(d.struktur).split(/\n\s*---\s*\n/).map(ln).filter(x=>x.length);return lv.length?`<div>${lv.map((L,i)=>`${i?'<div class="w-px h-5 bg-emerald-700 mx-auto"></div>':''}<div class="flex flex-wrap justify-center gap-3">${L.map(l=>{const [j,nm]=kv(l)[0];return`<div class="rounded-xl border-2 border-amber-400 bg-emerald-50 px-4 py-2 text-center text-sm shadow-sm"><div class="font-bold underline">${E(j)}</div>${nm?nm.split(';').map(x=>`<div>${E(x.trim())}</div>`).join(''):''}</div>`}).join('')}</div>`).join('')}</div>`:'';},
+ ptk:d=>{const pt=kv(d.ptk),T=pt.reduce((a,x)=>a+(+x[1]||0),0),pl='<span class="text-2xl text-amber-500 font-bold">';return pt.length?`<div class="flex flex-wrap items-center justify-center gap-4">${pt.map((x,i)=>`<div class="text-center"><div class="w-24 h-24 rounded-full bg-emerald-700 text-white text-3xl font-bold flex items-center justify-center">${E(x[1])}</div><div class="text-xs mt-1 font-semibold">${E(x[0])}${xb('ptk',i)}</div></div>`).join(pl+'+</span>')}${pl}=</span><div class="text-center"><div class="w-28 h-28 rounded-full bg-amber-500 text-emerald-950 text-4xl font-bold flex items-center justify-center">${T}</div><div class="text-xs mt-1 font-semibold">Total</div></div></div>`:'';},
+ unggulan:d=>chips('unggulan',ln(d.unggulan),'bg-emerald-700 text-white'),
+ ksb:d=>chips('ksb',ln(d.ksb),'bg-amber-100 border border-amber-400 text-emerald-900'),
+ siswa:d=>{const n=(a,i)=>+a[i]||0,sw=ln(d.siswa).map(l=>l.split(';').map(x=>x.trim())),th='<th class="border px-2 py-1"';return sw.length?`<div class="overflow-x-auto"><table class="w-full text-xs border-collapse"><thead class="bg-emerald-700 text-white"><tr>${th} rowspan="3">No</th>${th} rowspan="3">Tahun Pelajaran</th>${['Kelas X','Kelas XI','Kelas XII','Jumlah'].map(k=>`${th} colspan="3">${k}</th>`).join('')}${th} rowspan="3">Total</th>${S.pw?`${th} rowspan="3"></th>`:''}</tr><tr>${[0,1,2,3].map(()=>`${th} rowspan="2">Rombel</th>${th} colspan="2">Siswa</th>`).join('')}</tr><tr>${[0,1,2,3].map(()=>`${th}>L</th>${th}>P</th>`).join('')}</tr></thead><tbody>${sw.map((a,i)=>{const jl=n(a,2)+n(a,5)+n(a,8),jp=n(a,3)+n(a,6)+n(a,9);return`<tr class="${i%2?'bg-amber-50':''}">${[i+1,a[0],a[1],a[2],a[3],a[4],a[5],a[6],a[7],a[8],a[9],n(a,1)+n(a,4)+n(a,7),jl,jp,jl+jp].map(x=>`<td class="border px-2 py-1 text-center">${E(x??'')}</td>`).join('')}${S.pw?`<td class="border px-1">${xb('siswa',i)}</td>`:''}</tr>`}).join('')}</tbody></table></div>`:'';},
+ tahfidz:d=>{const tf=kv(d.tahfidz).map((x,i)=>[...x,i]),no=tf.filter(x=>!/^catatan/i.test(x[0])),ct=tf.filter(x=>/^catatan/i.test(x[0]));return tf.length?`<div class="grid grid-cols-3 gap-2 text-center">${no.map(x=>`<div class="rounded-lg overflow-hidden border"><div class="bg-emerald-700 text-white text-sm font-semibold py-1">${E(x[0])}${xb('tahfidz',x[2])}</div><div class="bg-emerald-50 py-3 text-sm font-bold">${E(x[1])}</div></div>`).join('')}</div>${ct.map(x=>`<p class="text-xs italic text-slate-500 mt-2">* ${E(x[1])}${xb('tahfidz',x[2])}</p>`).join('')}`:'';},
+ ekskul:d=>{const e=kv(d.ekskul);return e.length?`<div class="grid sm:grid-cols-3 gap-3">${e.map((x,i)=>`<div class="rounded-xl border overflow-hidden"><div class="bg-emerald-700 text-white text-center font-semibold py-1.5">${E(x[0])}${xb('ekskul',i)}</div><ul class="list-disc pl-6 py-2 text-sm bg-emerald-50">${x[1].split(',').map(y=>`<li>${E(y.trim())}</li>`).join('')}</ul></div>`).join('')}</div>`:'';},
+ kenaikan:d=>nlist(ln(d.kenaikan),'kenaikan'),
+ kelulusan:d=>nlist(ln(d.kelulusan),'kelulusan')};
+const ORD=[['identitas',''],['kepala',''],['visi',''],['misi',''],['struktur','lg:col-span-2'],['ptk',''],['unggulan',''],['siswa','lg:col-span-2'],['tahfidz',''],['ksb',''],['ekskul','lg:col-span-2'],['kenaikan',''],['kelulusan','']];
+const cuC=(d,k)=>(d.cm||[]).find(c=>c.k===k);
+const ttl=(d,k)=>{const c=cuC(d,k),x=SEC.find(y=>y[0]===k);return c?c.t:x?x[1]:k;};
+function profilMadrasah(){
+  const d=pmd(),tg=ln(d.tagline),nama=(kv(d.identitas).find(x=>/^nama/i.test(x[0]))||[0,"MA AL MA'TUQ"])[1],
+   secs=[...ORD,...(d.cm||[]).map(c=>[c.k,''])].filter(([k])=>S.pw||ln(d[k]).length),
+   body=k=>{const c=cuC(d,k);if(!c)return BODY[k](d);const a=ln(d[k]);return !a.length?'':c.y==='text'?`<p class="text-sm leading-relaxed whitespace-pre-line">${E(d[k])}</p>`:c.y==='kv'?kvt(k,kv(d[k])):nlist(a,k);};
+  return `<main class="w-full p-4 lg:p-6">
+  <section class="rounded-2xl text-white text-center p-8 shadow-lg" style="background:radial-gradient(ellipse at 35% 30%,#14532d 0%,#0f3d27 55%,#0a2a1b 100%)"><div class="text-amber-300 text-xs font-bold tracking-[.3em]">PROFIL MADRASAH</div><h1 class="text-4xl md:text-5xl font-extrabold mt-1">${E(nama)}</h1>
+   <div class="mt-3 text-amber-100">${tg.map((t,i)=>i?`<div class="text-sm tracking-widest">${E(t)}</div>`:`<div class="text-2xl" dir="rtl" lang="ar">${E(t)}</div>`).join('')}</div>${S.pw?`<button onclick="editBagian('tagline')" class="mt-3 text-xs bg-amber-400 text-emerald-950 rounded px-2 py-0.5">✏️ Edit motto</button>`:''}</section>
+  <div class="flex flex-wrap gap-2 mt-4">${secs.map(([k])=>`<button onclick="document.getElementById('pm_${k}').scrollIntoView({behavior:'smooth'})" class="px-3 py-1 rounded-full text-xs font-semibold bg-white border border-amber-300 text-emerald-800 hover:bg-amber-100">${E(ttl(d,k))}</button>`).join('')}</div>
+  <div class="grid lg:grid-cols-2 gap-4 mt-4">${secs.map(([k,c])=>pcard(k,E(ttl(d,k)),body(k),c)).join('')}</div>
+  ${S.pw?`<div class="flex flex-wrap gap-2 mt-5"><button onclick="tambahBagian()" class="bg-emerald-700 text-white rounded-lg px-4 py-1.5 text-sm font-semibold">➕ Tambah bagian baru</button><button onclick="resetPM()" class="text-red-600 text-sm px-2">Kembalikan semua ke isi bawaan</button></div>`:''}</main>`;
+}
+function pmSimpan(mut){return run(async()=>{const d=pmd();mut(d);const pm=JSON.stringify(d);await api({action:'saveProfil',data:{pm}});S.p.pm=pm;tutup();render();});}
+const tyOpt=v=>TY.map(([a,l])=>`<option value="${a}" ${a===v?'selected':''}>${l}</option>`).join('');
+function editBagian(k){
+  const d=pmd(),c=cuC(d,k),h=(SEC.find(x=>x[0]===k)||[0,0,'Pilih tampilan sesuai kebutuhan'])[2];
+  $('modal').innerHTML=box(`<h3 class="font-bold text-emerald-800 mb-2">Edit: ${E(ttl(d,k))}</h3>${c?`<input id="ec_t" value="${E(c.t)}" class="w-full border rounded p-1.5 text-sm mb-2"><select id="ec_y" class="border rounded p-1.5 text-sm mb-2">${tyOpt(c.y)}</select>`:''}
+  <div class="text-[11px] text-slate-400 mb-1">${E(h)}</div><textarea id="ec_x" rows="10" class="w-full border rounded p-1.5 text-sm mb-3">${E(d[k]||'')}</textarea>
+  <div class="flex gap-2"><button onclick="simpanBagian('${k}')" class="bg-emerald-700 text-white rounded px-4 py-1.5">Simpan</button><button onclick="tutup()" class="border rounded px-4 py-1.5">Batal</button></div>`);
+}
+function simpanBagian(k){pmSimpan(d=>{d[k]=$('ec_x').value.trim();const c=cuC(d,k);if(c){c.t=$('ec_t').value.trim()||c.t;c.y=$('ec_y').value;}});}
+function tambahBaris(k){
+  const d=pmd(),h=(SEC.find(x=>x[0]===k)||[0,0,'Satu baris per butir'])[2];
+  $('modal').innerHTML=box(`<h3 class="font-bold text-emerald-800 mb-2">Tambah ke: ${E(ttl(d,k))}</h3><div class="text-[11px] text-slate-400 mb-1">${E(h)}</div><textarea id="ab_x" rows="4" placeholder="Tulis baris baru..." class="w-full border rounded p-1.5 text-sm mb-3"></textarea>
+  <div class="flex gap-2"><button onclick="simpanBaris('${k}')" class="bg-emerald-700 text-white rounded px-4 py-1.5">Tambah</button><button onclick="tutup()" class="border rounded px-4 py-1.5">Batal</button></div>`,'max-w-lg');
+}
+function simpanBaris(k){const t=$('ab_x').value.trim();if(!t)return alert('Isi baris baru terlebih dahulu');pmSimpan(d=>{d[k]=[...ln(d[k]),t].join('\n');});}
+function hapusBaris(k,i){if(confirm('Hapus baris ini?'))pmSimpan(d=>{const a=ln(d[k]);a.splice(i,1);d[k]=a.join('\n');});}
+function hapusBagian(k){const d=pmd();if(confirm('Hapus seluruh isi bagian "'+ttl(d,k)+'"?'))pmSimpan(d=>{if(cuC(d,k)){d.cm=d.cm.filter(c=>c.k!==k);delete d[k];}else d[k]='';});}
+function tambahBagian(){
+  $('modal').innerHTML=box(`<h3 class="font-bold text-emerald-800 mb-2">Tambah Bagian Baru</h3><input id="nb_t" placeholder="Judul bagian" class="w-full border rounded p-1.5 text-sm mb-2"><select id="nb_y" class="border rounded p-1.5 text-sm mb-2">${tyOpt('list')}</select>
+  <textarea id="nb_x" rows="8" placeholder="Isi (satu baris per butir; untuk tabel tulis Label: Nilai)" class="w-full border rounded p-1.5 text-sm mb-3"></textarea>
+  <div class="flex gap-2"><button onclick="simpanBagianBaru()" class="bg-emerald-700 text-white rounded px-4 py-1.5">Simpan</button><button onclick="tutup()" class="border rounded px-4 py-1.5">Batal</button></div>`,'max-w-lg');
+}
+function simpanBagianBaru(){const t=$('nb_t').value.trim();if(!t)return alert('Judul bagian wajib diisi');pmSimpan(d=>{const k='c_'+Date.now().toString(36);d.cm=[...(d.cm||[]),{k,t,y:$('nb_y').value}];d[k]=$('nb_x').value.trim();});}
+function resetPM(){if(confirm('Kembalikan seluruh profil madrasah ke isi bawaan? Semua perubahan dan bagian baru akan hilang.'))run(async()=>{await api({action:'saveProfil',data:{pm:''}});S.p.pm='';render();});}
+function isiHtml(){const b=STRUKTUR.find(x=>x.k===S.pg);return S.q?hasil():(b?berkas(b):(S.pg==='profil'?profilMadrasah():(S.pg==='analisis'&&S.pw)?analisis():home()));}
+function cari(v){S.q=v.trim();$('isi').innerHTML=isiHtml();}
+function hasil(){
+  const t=S.q.toLowerCase().split(/\s+/),r=[];
+  STRUKTUR.forEach(b=>b.s.forEach(s=>s.i.forEach(i=>{const h=(i[0]+' '+i[1]+' '+s.t).toLowerCase();if(t.every(x=>h.includes(x)))r.push([b,s,i]);})));
+  return `<main class="w-full p-4 lg:p-6"><h2 class="font-bold text-emerald-800 text-lg mb-3">Hasil pencarian "${E(S.q)}" <span class="text-sm font-normal text-slate-500">(${r.length} butir)</span></h2>
+  ${r.map(([b,s,i])=>{const c=by(S.d.bukti,i[0]).length;return`<div onclick="bukaItem('${i[0]}')" class="bg-white rounded-lg shadow mb-2 p-3 cursor-pointer hover:bg-emerald-50"><div class="text-xs text-slate-400">${b.k} › ${s.k}. ${E(s.t)} · ${i[0]}</div><div class="flex items-start gap-2"><span class="flex-1 text-sm">${E(i[1])}</span><span class="text-xs rounded-full px-2 py-0.5 ${c?'bg-emerald-100 text-emerald-800':'bg-red-100 text-red-700'}">${c} bukti</span></div></div>`}).join('')||'<p class="text-sm text-slate-400">Tidak ada point berkas yang cocok.</p>'}</main>`;
+}
+function goto(k){if(k==='analisis'&&!S.pw)return;S.pg=k;S.q='';if(innerWidth<1024)S.nav=false;render();scrollTo(0,0);}
 function render(){
   const b=STRUKTUR.find(x=>x.k===S.pg);
   $('app').innerHTML=menu()+`<div class="${S.nav?'lg:ml-64':''} min-h-screen"><div class="bg-white shadow px-4 py-3 flex items-center gap-3 sticky top-0 z-30"><button onclick="S.nav=!S.nav;render()" class="text-xl">☰</button>
-  <div class="text-sm"><b class="text-emerald-800">PKKM</b> <span class="text-slate-400">/</span> ${b?E(b.k+'. '+b.t):'Halaman Muka'}</div></div>${b?berkas(b):home()}</div>`;
+  <div class="text-sm truncate min-w-0 flex-1"><b class="text-emerald-800">PKKM</b> <span class="text-slate-400">/</span> ${b?E(b.k+'. '+b.t):(S.pg==='analisis'?'Analisis Kelengkapan':S.pg==='profil'?'Profil Madrasah':'Halaman Muka')}</div><input id="cq" type="search" placeholder="🔍 Cari point berkas..." value="${E(S.q)}" oninput="cari(this.value)" class="border border-amber-300 rounded-lg px-3 py-1.5 text-sm w-44 sm:w-72"></div><div id="isi">${isiHtml()}</div></div>`;
 }
 // ---- halaman muka
 function home(){
-  const p=S.p||{},foto=p.fotoId?`https://drive.google.com/thumbnail?id=${E(p.fotoId)}&sz=w600`:'';
-  return `<main class="max-w-4xl mx-auto p-4">
-  <section class="bg-gradient-to-br from-emerald-800 to-emerald-600 text-white rounded-2xl p-8 text-center shadow">${p.logoId?`<img src="https://drive.google.com/thumbnail?id=${E(p.logoId)}&sz=w300" class="w-20 h-20 mx-auto mb-2 rounded-full bg-white object-contain p-1">`:''}<div class="text-amber-300 text-xs tracking-widest">✦ PORTAL DOKUMEN DIGITAL</div><h1 class="text-3xl font-bold mt-1">${E(p.nama||"MA AL MA'TUQ")}</h1>
-  <p class="mt-2 text-sm">NSM: ${E(p.nsm||'-')}</p><p class="text-sm">${E(p.alamat||'-')}</p><p class="text-sm">${E(p.kontak||'')}</p></section>
-  <section class="bg-white rounded-2xl shadow mt-4 p-5 flex flex-col sm:flex-row gap-5 items-center sm:items-start"><div class="w-40 h-52 shrink-0 rounded-xl overflow-hidden bg-amber-100 border-4 border-amber-400 flex items-center justify-center">${foto?`<img src="${foto}" class="w-full h-full object-cover">`:'<span class="text-5xl">👤</span>'}</div>
-  <div><div class="text-xs text-amber-600 font-bold">KEPALA MADRASAH</div><h2 class="text-xl font-bold text-emerald-800">${E(p.kepala||'-')}</h2><div class="text-sm text-slate-500 mb-2">NIP. ${E(p.nip||'-')}</div><p class="text-sm whitespace-pre-line">${E(p.sambutan||'')}</p></div></section>
-  <section class="grid sm:grid-cols-2 gap-4 mt-4"><div class="bg-white rounded-2xl shadow p-5"><h3 class="font-bold text-emerald-800 mb-2">Visi</h3><p class="text-sm whitespace-pre-line">${E(p.visi||'-')}</p></div><div class="bg-white rounded-2xl shadow p-5"><h3 class="font-bold text-emerald-800 mb-2">Misi</h3><p class="text-sm whitespace-pre-line">${E(p.misi||'-')}</p></div></section>
-  <h3 class="font-bold text-emerald-800 mt-6 mb-2">Kelengkapan Berkas</h3><div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">${STRUKTUR.map(b=>{const it=b.s.flatMap(s=>s.i),n=it.filter(i=>by(S.d.bukti,i[0]).length).length;
+  const p=S.p||{},foto=p.fotoId?`https://drive.google.com/thumbnail?id=${E(p.fotoId)}&sz=w800`:'',logo=p.logoId?`https://drive.google.com/thumbnail?id=${E(p.logoId)}&sz=w100`:'',nm=(p.nama||"MA AL MA'TUQ").toUpperCase();
+  return `<main class="w-full p-4 lg:p-6">
+  <section class="relative overflow-hidden rounded-2xl text-white shadow-lg" style="background:radial-gradient(ellipse at 35% 30%,#14532d 0%,#0f3d27 55%,#0a2a1b 100%)">
+   <div class="absolute rounded-full border border-amber-400/25" style="right:-90px;top:-130px;width:440px;height:440px"></div><div class="absolute rounded-full border border-amber-400/10" style="right:-150px;top:-190px;width:560px;height:560px"></div>
+   <div class="relative flex flex-col-reverse md:flex-row items-center justify-between gap-8 p-8 md:px-12 md:py-10">
+    <div class="w-full"><div class="text-[11px] md:text-xs font-bold tracking-[.3em] text-amber-300">PENILAIAN KINERJA KEPALA MADRASAH</div>
+     <h1 class="text-6xl md:text-8xl font-extrabold leading-none mt-2">PKKM</h1>
+     <div class="mt-2 text-sm md:text-lg font-semibold tracking-widest text-amber-50">PENILAIAN KINERJA KEPALA MADRASAH · TAHUN 2026</div>
+     <div class="w-60 h-px bg-amber-500 mt-5 mb-3"></div>
+     <div class="flex items-center gap-2 font-bold tracking-widest text-sm">${logo?`<img src="${logo}" class="w-8 h-8 rounded-full bg-white object-contain">`:''}<span>✦ ${E(nm)}</span></div>
+     ${p.nsm?`<div class="text-xs text-emerald-100 mt-2">NSM: ${E(p.nsm)}</div>`:''}${p.alamat?`<div class="text-xs text-emerald-100">${E(p.alamat)}</div>`:''}${p.kontak?`<div class="text-xs text-emerald-100">${E(p.kontak)}</div>`:''}</div>
+    <div class="text-center shrink-0"><div class="w-44 h-56 md:w-56 md:h-72 mx-auto rounded-2xl p-1.5 shadow-xl" style="background:linear-gradient(135deg,#f6d36b,#b8862b 50%,#f6d36b)"><div class="relative w-full h-full rounded-xl overflow-hidden bg-white flex items-center justify-center">${foto?`<img src="${foto}" class="w-full h-full object-cover object-top">`:'<span class="text-6xl">👤</span>'}
+     <div class="absolute bottom-3 left-1/2 -translate-x-1/2 px-6 py-0.5 text-xs md:text-sm font-bold text-white whitespace-nowrap" style="background:#166534;border:2px solid #facc15;clip-path:polygon(7% 0,93% 0,100% 50%,93% 100%,7% 100%,0 50%)">${E(p.kepala||'Kepala Madrasah')}</div></div></div>
+     <div class="inline-block mt-3 border border-amber-500/60 rounded-full px-4 py-1 text-[11px] font-bold tracking-widest text-amber-200">KEPALA MADRASAH</div></div>
+   </div></section>
+  <div class="grid lg:grid-cols-3 gap-4 mt-4">
+   <div class="bg-white rounded-2xl shadow p-5"><div class="text-xs text-amber-600 font-bold">SAMBUTAN KEPALA MADRASAH</div><div class="font-bold text-emerald-800 mt-1">${E(p.kepala||'-')}</div><div class="text-xs text-slate-500 mb-2">NIP. ${E(p.nip||'-')}</div><p class="text-sm whitespace-pre-line">${E(p.sambutan||'')}</p></div>
+   <div class="bg-white rounded-2xl shadow p-5"><h3 class="font-bold text-emerald-800 mb-2">Visi</h3><p class="text-sm whitespace-pre-line">${E(p.visi||'-')}</p></div>
+   <div class="bg-white rounded-2xl shadow p-5"><h3 class="font-bold text-emerald-800 mb-2">Misi</h3><p class="text-sm whitespace-pre-line">${E(p.misi||'-')}</p></div></div>
+  ${S.pw?`<h3 class="font-bold text-emerald-800 mt-6 mb-2">Kelengkapan Berkas</h3><div class="grid sm:grid-cols-2 xl:grid-cols-5 gap-3">${STRUKTUR.map(b=>{const it=b.s.flatMap(s=>s.i),n=it.filter(i=>by(S.d.bukti,i[0]).length).length;
   return`<button onclick="goto('${b.k}')" class="bg-white rounded-xl shadow p-4 text-left hover:ring-2 ring-amber-400"><div class="text-xs text-amber-600 font-bold">${b.k}</div><div class="font-semibold text-sm text-emerald-900">${E(b.t)}</div>
-  <div class="h-2 bg-amber-100 rounded mt-2"><div class="h-2 bg-emerald-600 rounded" style="width:${n/it.length*100}%"></div></div><div class="text-xs text-slate-500 mt-1">${n}/${it.length} butir terisi</div></button>`}).join('')}</div>
+  <div class="h-2 bg-amber-100 rounded mt-2"><div class="h-2 bg-emerald-600 rounded" style="width:${n/it.length*100}%"></div></div><div class="text-xs text-slate-500 mt-1">${n}/${it.length} butir terisi</div></button>`}).join('')}</div>`:''}
   ${S.pw?`<button onclick="editProfil()" class="mt-5 bg-amber-500 rounded-lg px-4 py-1.5 font-semibold text-sm">✏️ Edit profil</button>`:''}</main>`;
 }
 const PF=[['nama','Nama madrasah'],['nsm','NSM'],['alamat','Alamat'],['kontak','Kontak (telepon/email)'],['kepala','Nama kepala madrasah'],['nip','NIP kepala madrasah']],PT=[['sambutan','Sambutan kepala madrasah'],['visi','Visi'],['misi','Misi (satu baris per poin)']];
@@ -77,28 +195,47 @@ function simpanProfil(){run(async()=>{
 // ---- halaman berkas per bagian
 function berkas(b){
   const it=b.s.flatMap(s=>s.i),n=it.filter(i=>by(S.d.bukti,i[0]).length).length;
-  return `<main class="max-w-4xl mx-auto p-4"><button onclick="goto('home')" class="mb-3 inline-flex items-center gap-1 bg-white border border-amber-400 text-emerald-800 rounded-lg px-3 py-1.5 text-sm font-semibold hover:bg-amber-100">← Kembali</button><h2 class="font-bold text-emerald-800 text-lg">${b.k}. ${E(b.t)}</h2><p class="text-xs text-slate-500 mb-3">${n} dari ${it.length} butir sudah memiliki bukti · klik butir untuk membuka berkas</p>
-  ${b.s.map(s=>`<details class="bg-white rounded-xl shadow mb-3" open><summary class="cursor-pointer p-3 font-semibold bg-amber-100 rounded-t-xl">${s.k}. ${E(s.t)} <span class="text-xs font-normal text-slate-500">(${s.i.filter(i=>by(S.d.bukti,i[0]).length).length}/${s.i.length})</span></summary>
+  return `<main class="w-full p-4 lg:p-6"><button onclick="goto('home')" class="mb-3 inline-flex items-center gap-1 bg-white border border-amber-400 text-emerald-800 rounded-lg px-3 py-1.5 text-sm font-semibold hover:bg-amber-100">← Kembali</button><h2 class="font-bold text-emerald-800 text-lg">${b.k}. ${E(b.t)}</h2><p class="text-xs text-slate-500 mb-3">${S.pw?`${n} dari ${it.length} butir sudah memiliki bukti · `:''}klik butir untuk membuka berkas</p>
+  ${b.s.map(s=>`<details class="bg-white rounded-xl shadow mb-3" open><summary class="cursor-pointer p-3 font-semibold bg-amber-100 rounded-t-xl">${s.k}. ${E(s.t)} ${S.pw?`<span class="text-xs font-normal text-slate-500">(${s.i.filter(i=>by(S.d.bukti,i[0]).length).length}/${s.i.length})</span>`:''}</summary>
   ${s.i.map(i=>{const c=by(S.d.bukti,i[0]).length;return`<div onclick="bukaItem('${i[0]}')" class="flex items-start gap-2 p-3 border-t cursor-pointer hover:bg-emerald-50"><span class="text-xs text-slate-400 w-12 shrink-0">${i[0]}</span><span class="flex-1 text-sm">${E(i[1])}</span>
   <span class="text-xs rounded-full px-2 py-0.5 ${c?'bg-emerald-100 text-emerald-800':'bg-red-100 text-red-700'}">${c} bukti</span>${by(S.d.komentar,i[0]).length?`<span class="text-xs">💬${by(S.d.komentar,i[0]).length}</span>`:''}</div>`}).join('')}</details>`).join('')}</main>`;
 }
 function bukaItem(id){
   S.it=id;const up=!!S.pw,it=STRUKTUR.flatMap(b=>b.s.flatMap(s=>s.i)).find(i=>i[0]===id);
-  $('modal').innerHTML=box(`<div class="flex justify-between gap-3"><div><div class="text-xs text-amber-600 font-bold">${id}</div><h3 class="font-bold text-emerald-800">${E(it[1])}</h3></div><button onclick="tutup()" class="text-2xl leading-none">×</button></div>
+  $('modal').innerHTML=box(`<div class="flex justify-between gap-3"><div class="flex-1"><div class="text-xs text-amber-600 font-bold">${id}</div><div id="jd"><h3 class="font-bold text-emerald-800">${E(it[1])}</h3>${up?`<button onclick="editButir('${id}')" class="text-xs underline text-amber-700">✏️ Edit nama butir</button>`:''}</div></div><button onclick="tutup()" class="text-2xl leading-none">×</button></div>
   <h4 class="font-semibold mt-4 mb-1">Berkas & Bukti</h4>
   ${by(S.d.bukti,id).map(x=>`<div class="border rounded-lg p-2 mb-1 text-sm"><div class="flex items-center justify-between gap-2">${x.url?`<a href="${E(x.url)}" target="_blank" class="text-emerald-700 underline break-all">${x.fileId?'📎':'🔗'} ${E(x.nama)}</a>`:`<b class="text-emerald-800">📝 ${E(x.nama)}</b>`}${up?`<button onclick="hapus('${x.id}')" class="text-red-600 text-xs shrink-0">Hapus</button>`:''}</div>${x.teks?`<p class="mt-1 whitespace-pre-line text-slate-700">${E(x.teks)}</p>`:''}</div>`).join('')||'<p class="text-sm text-slate-400">Belum ada bukti.</p>'}
-  ${up?`<div class="bg-emerald-50 rounded-lg p-3 mt-2 text-sm"><p class="text-xs text-slate-500 mb-2">Isi salah satu atau lebih: file, link, atau keterangan teks (tidak wajib upload file).</p><input id="bn" placeholder="Nama bukti (opsional)" class="w-full border rounded p-1.5 mb-2"><input id="bf" type="file" class="mb-2 block w-full text-xs"><input id="bl" placeholder="atau tempel link Drive/URL" class="w-full border rounded p-1.5 mb-2"><textarea id="bt" rows="3" placeholder="atau tulis keterangan / beberapa kalimat / paragraf" class="w-full border rounded p-1.5 mb-2"></textarea><button onclick="tambah('${id}')" class="bg-emerald-700 text-white rounded px-4 py-1.5">Simpan bukti</button></div>`:''}
+  ${up?`<div class="bg-emerald-50 rounded-lg p-3 mt-2 text-sm"><p class="text-xs text-slate-500 mb-2">Isi salah satu atau lebih: file, link, atau keterangan teks (tidak wajib upload file).</p><input id="bn" placeholder="Nama bukti (opsional)" class="w-full border rounded p-1.5 mb-2"><input id="bf" type="file" class="mb-2 block w-full text-xs"><input id="bl" placeholder="atau tempel link Drive/URL" class="w-full border rounded p-1.5 mb-2"><textarea id="bt" rows="3" placeholder="atau tulis keterangan / beberapa kalimat / paragraf" class="w-full border rounded p-1.5 mb-2"></textarea><button id="bs" onclick="tambah('${id}')" class="bg-emerald-700 text-white rounded px-4 py-1.5">Simpan bukti</button></div>`:''}
   <h4 class="font-semibold mt-4 mb-1">Komentar Pengawas</h4>
   ${by(S.d.komentar,id).map(k=>`<div class="bg-amber-50 rounded-lg p-2 mb-1 text-sm"><b>${E(k.oleh)}</b> <span class="text-xs text-slate-400">(${new Date(k.waktu).toLocaleString('id-ID')})</span>${up?`<button onclick="hapusKomentar('${k.id}')" class="text-red-600 text-xs ml-2">Hapus</button>`:''}<br>${E(k.teks)}</div>`).join('')||'<p class="text-sm text-slate-400">Belum ada komentar.</p>'}
   <div class="mt-2"><input id="kn" placeholder="Nama pengawas" value="${E(S.nm)}" class="w-full border rounded p-1.5 text-sm mb-2"><div class="flex gap-2"><input id="kt" placeholder="Tulis komentar..." class="flex-1 border rounded p-1.5 text-sm"><button onclick="kirimKomentar('${id}')" class="bg-amber-500 rounded px-3 text-sm font-semibold">Kirim</button></div></div>`);
 }
+function editButir(id){
+  const it=STRUKTUR.flatMap(b=>b.s.flatMap(s=>s.i)).find(i=>i[0]===id);
+  $('jd').innerHTML=`<textarea id="eb" rows="3" class="w-full border rounded p-1.5 text-sm mt-1">${E(it[1])}</textarea><div class="flex flex-wrap gap-2 mt-1 text-xs"><button onclick="simpanButir('${id}')" class="bg-emerald-700 text-white rounded px-3 py-1">Simpan</button><button onclick="bukaItem('${id}')" class="border rounded px-3 py-1">Batal</button><button onclick="simpanButir('${id}',1)" class="text-red-600 px-2">Kembalikan ke nama awal</button></div>`;
+}
+function simpanButir(id,reset){run(async()=>{
+  const nama=reset?'':$('eb').value.trim();if(!reset&&!nama)throw new Error('Nama butir tidak boleh kosong');
+  await api({action:'editButir',itemId:id,nama});if(nama)S.bn[id]=nama;else delete S.bn[id];pakaiButir();render();bukaItem(id);});}
+async function siapFile(f){
+  if(/^image\/(jpeg|png|webp)$/.test(f.type)&&f.size>600*1024){
+    try{const m=await createImageBitmap(f),k=Math.min(1,1600/Math.max(m.width,m.height)),c=document.createElement('canvas');c.width=Math.round(m.width*k);c.height=Math.round(m.height*k);
+    c.getContext('2d').drawImage(m,0,0,c.width,c.height);const bl=await new Promise(r=>c.toBlob(r,'image/jpeg',.82));
+    if(bl&&bl.size<f.size)return{name:f.name.replace(/\.\w+$/,'')+'.jpg',mime:'image/jpeg',data:await b64(bl)};}catch(e){}
+  }
+  return{name:f.name,mime:f.type||'application/octet-stream',data:await b64(f)};
+}
 function tambah(id){run(async()=>{
-  const f=$('bf').files[0],body={action:'addBukti',itemId:id,nama:$('bn').value.trim(),link:$('bl').value.trim(),teks:$('bt').value.trim()};
-  if(f){if(f.size>20*1048576)throw new Error('Ukuran file maksimal 20 MB');body.file={name:f.name,mime:f.type||'application/octet-stream',data:await b64(f)};}
-  await api(body);await muat();});}
-function hapus(x){if(confirm('Hapus bukti ini?'))run(async()=>{await api({action:'delBukti',id:x});await muat();});}
-function kirimKomentar(id){run(async()=>{const nama=$('kn').value.trim();S.nm=nama;localStorage.setItem('pk_nm',nama);await api({action:'komentar',itemId:id,nama,teks:$('kt').value});await muat();});}
-function hapusKomentar(x){if(confirm('Hapus komentar ini?'))run(async()=>{await api({action:'delKomentar',id:x});await muat();});}
+  const bt=$('bs');bt.disabled=true;bt.textContent='⏳ Memproses...';
+  try{
+    const f=$('bf').files[0],body={action:'addBukti',itemId:id,nama:$('bn').value.trim(),link:$('bl').value.trim(),teks:$('bt').value.trim()};
+    if(f){if(f.size>20*1048576)throw new Error('Ukuran file maksimal 20 MB');body.file=await siapFile(f);bt.textContent='⏳ Mengunggah...';}
+    const j=await api(body);S.d.bukti.push(j.rec);render();bukaItem(id);
+  }finally{bt.disabled=false;bt.textContent='Simpan bukti';}
+});}
+function hapus(x){if(confirm('Hapus bukti ini?'))run(async()=>{const it=S.it;await api({action:'delBukti',id:x});S.d.bukti=S.d.bukti.filter(b=>b.id!==x);render();bukaItem(it);});}
+function kirimKomentar(id){run(async()=>{const nama=$('kn').value.trim();S.nm=nama;localStorage.setItem('pk_nm',nama);const j=await api({action:'komentar',itemId:id,nama,teks:$('kt').value});S.d.komentar.push(j.rec);render();bukaItem(id);});}
+function hapusKomentar(x){if(confirm('Hapus komentar ini?'))run(async()=>{const it=S.it;await api({action:'delKomentar',id:x});S.d.komentar=S.d.komentar.filter(k=>k.id!==x);render();bukaItem(it);});}
 render();run(muatProfil);run(muat);
 if(S.pw)run(async()=>{try{await api({action:'cekPwd'});}catch(e){S.pw='';SS('pk_pw','');render();}});
 </script></body></html>
