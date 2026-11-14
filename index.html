@@ -25,7 +25,7 @@ async function muat(){S.d=await api({action:'load'});S.bn={};(S.d.butir||[]).for
 async function muatProfil(){S.p=(await api({action:'profil'})).profil;render();}
 const by=(a,id)=>a.filter(x=>x.itemId===id);
 const box=(h,w='max-w-2xl')=>`<div class="fixed inset-0 bg-black/50 flex items-center justify-center p-3 z-50" onclick="if(event.target===this)tutup()"><div class="bg-white rounded-2xl w-full ${w} max-h-[90vh] overflow-y-auto p-5 border-t-4 border-amber-500">${h}</div></div>`;
-function tutup(){S.it=null;$('modal').innerHTML='';}
+function tutup(){S.it=null;S.vw='';$('modal').innerHTML='';}
 const b64=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result.split(',')[1]);r.onerror=no;r.readAsDataURL(f);});
 // ---- masuk admin (password cukup sekali)
 function adminForm(){$('modal').innerHTML=box(`<h3 class="font-bold text-emerald-800 text-center">🔑 Masuk Admin</h3><p class="text-xs text-center text-slate-500 mb-4">Khusus admin sekolah untuk mengunggah dan mengelola berkas</p>
@@ -200,15 +200,39 @@ function berkas(b){
   ${s.i.map(i=>{const c=by(S.d.bukti,i[0]).length;return`<div onclick="bukaItem('${i[0]}')" class="flex items-start gap-2 p-3 border-t cursor-pointer hover:bg-emerald-50"><span class="text-xs text-slate-400 w-12 shrink-0">${i[0]}</span><span class="flex-1 text-sm">${E(i[1])}</span>
   <span class="text-xs rounded-full px-2 py-0.5 ${c?'bg-emerald-100 text-emerald-800':'bg-red-100 text-red-700'}">${c} bukti</span>${by(S.d.komentar,i[0]).length?`<span class="text-xs">💬${by(S.d.komentar,i[0]).length}</span>`:''}</div>`}).join('')}</details>`).join('')}</main>`;
 }
+function prev(x){
+  const u=String(x.url||'');if(!u)return null;let m;
+  if(x.fileId)return{t:'f',src:`https://drive.google.com/file/d/${x.fileId}/preview`,open:`https://drive.google.com/file/d/${x.fileId}/view`};
+  m=u.match(/drive\.google\.com\/file\/d\/([\w-]+)/)||u.match(/drive\.google\.com\/(?:open|uc)\?(?:[^#]*&)?id=([\w-]+)/);
+  if(m)return{t:'f',src:`https://drive.google.com/file/d/${m[1]}/preview`,open:`https://drive.google.com/file/d/${m[1]}/view`};
+  m=u.match(/docs\.google\.com\/(document|spreadsheets|presentation)\/d\/([\w-]+)/);
+  if(m){const v=`https://docs.google.com/${m[1]}/d/${m[2]}/preview`;return{t:'f',src:v,open:v};}
+  m=u.match(/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/([\w-]+)/);
+  if(m)return{t:'f',src:`https://drive.google.com/embeddedfolderview?id=${m[1]}#list`,open:u};
+  m=u.match(/(?:youtube\.com\/watch\?(?:[^#]*&)?v=|youtu\.be\/)([\w-]{6,})/);
+  if(m)return{t:'f',src:`https://www.youtube.com/embed/${m[1]}`,open:u};
+  if(/\.(jpe?g|png|gif|webp|svg)(\?|#|$)/i.test(u))return{t:'i',src:u,open:u};
+  if(/\.(pdf|docx?|xlsx?|pptx?)(\?|#|$)/i.test(u))return{t:'f',src:'https://docs.google.com/viewer?embedded=true&url='+encodeURIComponent(u),open:u};
+  return null;
+}
+function selX(id){const bl=by(S.d.bukti,id);return bl.find(b=>b.id===S.vw&&b.url)||bl.find(b=>b.url);}
+function viewBukti(x){S.vw=x;bukaItem(S.it);}
+function viewerFor(id){
+  const x=selX(id);if(!x)return'';
+  const p=prev(x),op=S.pw?x.url:(p?p.open:x.url);
+  return `<div class="mt-2 border rounded-lg overflow-hidden bg-slate-50"><div class="flex items-center justify-between gap-2 px-3 py-1.5 bg-amber-100 text-xs"><b class="truncate">👁️ ${E(x.nama)}</b><a href="${E(op)}" target="_blank" class="underline text-emerald-800 shrink-0">↗ Buka di tab baru</a></div>
+  ${p?(p.t==='i'?`<img src="${E(p.src)}" class="max-h-[70vh] mx-auto">`:`<iframe src="${E(p.src)}" class="w-full h-[70vh] border-0" allow="autoplay" loading="lazy"></iframe>`):`<p class="p-4 text-sm text-slate-500">Tampilan langsung belum tersedia untuk jenis tautan ini. Gunakan "Buka di tab baru".</p>`}</div>`;
+}
 function bukaItem(id){
   S.it=id;const up=!!S.pw,it=STRUKTUR.flatMap(b=>b.s.flatMap(s=>s.i)).find(i=>i[0]===id);
   $('modal').innerHTML=box(`<div class="flex justify-between gap-3"><div class="flex-1"><div class="text-xs text-amber-600 font-bold">${id}</div><div id="jd"><h3 class="font-bold text-emerald-800">${E(it[1])}</h3>${up?`<button onclick="editButir('${id}')" class="text-xs underline text-amber-700">✏️ Edit nama butir</button>`:''}</div></div><button onclick="tutup()" class="text-2xl leading-none">×</button></div>
   <h4 class="font-semibold mt-4 mb-1">Berkas & Bukti</h4>
-  ${by(S.d.bukti,id).map(x=>`<div class="border rounded-lg p-2 mb-1 text-sm"><div class="flex items-center justify-between gap-2">${x.url?`<a href="${E(x.url)}" target="_blank" class="text-emerald-700 underline break-all">${x.fileId?'📎':'🔗'} ${E(x.nama)}</a>`:`<b class="text-emerald-800">📝 ${E(x.nama)}</b>`}${up?`<button onclick="hapus('${x.id}')" class="text-red-600 text-xs shrink-0">Hapus</button>`:''}</div>${x.teks?`<p class="mt-1 whitespace-pre-line text-slate-700">${E(x.teks)}</p>`:''}</div>`).join('')||'<p class="text-sm text-slate-400">Belum ada bukti.</p>'}
-  ${up?`<div class="bg-emerald-50 rounded-lg p-3 mt-2 text-sm"><p class="text-xs text-slate-500 mb-2">Isi salah satu atau lebih: file, link, atau keterangan teks (tidak wajib upload file).</p><input id="bn" placeholder="Nama bukti (opsional)" class="w-full border rounded p-1.5 mb-2"><input id="bf" type="file" class="mb-2 block w-full text-xs"><input id="bl" placeholder="atau tempel link Drive/URL" class="w-full border rounded p-1.5 mb-2"><textarea id="bt" rows="3" placeholder="atau tulis keterangan / beberapa kalimat / paragraf" class="w-full border rounded p-1.5 mb-2"></textarea><button id="bs" onclick="tambah('${id}')" class="bg-emerald-700 text-white rounded px-4 py-1.5">Simpan bukti</button></div>`:''}
+  ${by(S.d.bukti,id).map(x=>{const sx=selX(id),p=prev(x),op=S.pw?x.url:(p?p.open:x.url);return`<div class="border rounded-lg p-2 mb-1 text-sm ${sx&&sx.id===x.id?'ring-2 ring-amber-400':''}"><div class="flex items-center justify-between gap-2">${x.url?`<button onclick="viewBukti('${x.id}')" class="text-left text-emerald-700 underline break-all">${x.fileId?'📎':'🔗'} ${E(x.nama)}</button>`:`<b class="text-emerald-800">📝 ${E(x.nama)}</b>`}<span class="shrink-0 flex items-center gap-2">${x.url?`<a href="${E(op)}" target="_blank" title="Buka di tab baru" class="text-emerald-700">↗</a>`:''}${up?`<button onclick="hapus('${x.id}')" class="text-red-600 text-xs">Hapus</button>`:''}</span></div>${x.teks?`<p class="mt-1 whitespace-pre-line text-slate-700">${E(x.teks)}</p>`:''}</div>`}).join('')||'<p class="text-sm text-slate-400">Belum ada bukti.</p>'}
+  ${viewerFor(id)}
+  ${up?`<div class="bg-emerald-50 rounded-lg p-3 mt-2 text-sm"><p class="text-xs text-slate-500 mb-2">Isi salah satu atau lebih: file (Word, Excel, PowerPoint, PDF, gambar, dll.), link, atau keterangan teks. Tidak wajib upload file.</p><input id="bn" placeholder="Nama bukti (opsional, dipakai bila hanya 1 file)" class="w-full border rounded p-1.5 mb-2"><input id="bf" type="file" multiple onchange="$('bfn').textContent=this.files.length?this.files.length+' file dipilih':''" class="mb-1 block w-full text-xs"><div id="bfn" class="text-xs text-emerald-700 mb-2"></div><input id="bl" placeholder="atau tempel link Drive/URL" class="w-full border rounded p-1.5 mb-2"><textarea id="bt" rows="3" placeholder="atau tulis keterangan / beberapa kalimat / paragraf" class="w-full border rounded p-1.5 mb-2"></textarea><button id="bs" onclick="tambah('${id}')" class="bg-emerald-700 text-white rounded px-4 py-1.5">Simpan bukti</button></div>`:''}
   <h4 class="font-semibold mt-4 mb-1">Komentar Pengawas</h4>
   ${by(S.d.komentar,id).map(k=>`<div class="bg-amber-50 rounded-lg p-2 mb-1 text-sm"><b>${E(k.oleh)}</b> <span class="text-xs text-slate-400">(${new Date(k.waktu).toLocaleString('id-ID')})</span>${up?`<button onclick="hapusKomentar('${k.id}')" class="text-red-600 text-xs ml-2">Hapus</button>`:''}<br>${E(k.teks)}</div>`).join('')||'<p class="text-sm text-slate-400">Belum ada komentar.</p>'}
-  <div class="mt-2"><input id="kn" placeholder="Nama pengawas" value="${E(S.nm)}" class="w-full border rounded p-1.5 text-sm mb-2"><div class="flex gap-2"><input id="kt" placeholder="Tulis komentar..." class="flex-1 border rounded p-1.5 text-sm"><button onclick="kirimKomentar('${id}')" class="bg-amber-500 rounded px-3 text-sm font-semibold">Kirim</button></div></div>`);
+  <div class="mt-2"><input id="kn" placeholder="Nama pengawas" value="${E(S.nm)}" class="w-full border rounded p-1.5 text-sm mb-2"><div class="flex gap-2"><input id="kt" placeholder="Tulis komentar..." class="flex-1 border rounded p-1.5 text-sm"><button onclick="kirimKomentar('${id}')" class="bg-amber-500 rounded px-3 text-sm font-semibold">Kirim</button></div></div>`,'max-w-4xl');
 }
 function editButir(id){
   const it=STRUKTUR.flatMap(b=>b.s.flatMap(s=>s.i)).find(i=>i[0]===id);
@@ -226,12 +250,19 @@ async function siapFile(f){
   return{name:f.name,mime:f.type||'application/octet-stream',data:await b64(f)};
 }
 function tambah(id){run(async()=>{
-  const bt=$('bs');bt.disabled=true;bt.textContent='⏳ Memproses...';
+  const bt=$('bs'),fs=[...($('bf').files||[])],nama=$('bn').value.trim(),link=$('bl').value.trim(),teks=$('bt').value.trim();
+  if(!fs.length&&!link&&!teks)throw new Error('Pilih file, isi link, atau tulis keterangan');
+  const big=fs.find(f=>f.size>20*1048576);if(big)throw new Error('Ukuran file maksimal 20 MB: '+big.name);
+  bt.disabled=true;let ok=0;const gagal=[];
   try{
-    const f=$('bf').files[0],body={action:'addBukti',itemId:id,nama:$('bn').value.trim(),link:$('bl').value.trim(),teks:$('bt').value.trim()};
-    if(f){if(f.size>20*1048576)throw new Error('Ukuran file maksimal 20 MB');body.file=await siapFile(f);bt.textContent='⏳ Mengunggah...';}
-    const j=await api(body);S.d.bukti.push(j.rec);render();bukaItem(id);
-  }finally{bt.disabled=false;bt.textContent='Simpan bukti';}
+    if(link||teks){bt.textContent='⏳ Menyimpan...';const j=await api({action:'addBukti',itemId:id,nama:fs.length?'':nama,link,teks});S.d.bukti.push(j.rec);S.vw=j.rec.id;ok++;}
+    for(let i=0;i<fs.length;i++){
+      bt.textContent=`⏳ Mengunggah ${i+1}/${fs.length}...`;
+      try{const file=await siapFile(fs[i]),j=await api({action:'addBukti',itemId:id,nama:fs.length===1?nama:'',file});S.d.bukti.push(j.rec);S.vw=j.rec.id;ok++;}
+      catch(e){gagal.push(fs[i].name+' ('+e.message+')');}
+    }
+  }finally{bt.disabled=false;bt.textContent='Simpan bukti';render();bukaItem(id);}
+  if(gagal.length)alert(ok+' berhasil. Gagal:\n'+gagal.join('\n'));
 });}
 function hapus(x){if(confirm('Hapus bukti ini?'))run(async()=>{const it=S.it;await api({action:'delBukti',id:x});S.d.bukti=S.d.bukti.filter(b=>b.id!==x);render();bukaItem(it);});}
 function kirimKomentar(id){run(async()=>{const nama=$('kn').value.trim();S.nm=nama;localStorage.setItem('pk_nm',nama);const j=await api({action:'komentar',itemId:id,nama,teks:$('kt').value});S.d.komentar.push(j.rec);render();bukaItem(id);});}
